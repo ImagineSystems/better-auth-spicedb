@@ -178,7 +178,7 @@ export const spicedb = (options: SpiceDBPluginOptions): BetterAuthPlugin => {
                   objectId: namespace(actualSubjectId) 
                 })
               }),
-              context: context ? Struct.fromJson(context) : undefined,
+              context: context ? (Struct.fromJavaScript(context) as any) : undefined,
             });
 
             const response = await promiseClient.checkPermission(request);
@@ -232,7 +232,7 @@ export const spicedb = (options: SpiceDBPluginOptions): BetterAuthPlugin => {
                       objectId: namespace(actualSubjectId) 
                     })
                   }),
-                  context: context ? Struct.fromJson(context) : undefined,
+                  context: context ? (Struct.fromJavaScript(context) as any) : undefined,
                 });
 
                 const response = await promiseClient.checkPermission(request);
@@ -293,8 +293,7 @@ export const spicedb = (options: SpiceDBPluginOptions): BetterAuthPlugin => {
                   fullyConsistent: true
                 }
               }),
-              context: context ? Struct.fromJson(context) : undefined,
-            });
+            context: context ? (Struct.fromJavaScript(context) as any) : undefined,            });
 
             const resourceIds: string[] = [];
             for await (const response of await promiseClient.lookupResources(request)) {
