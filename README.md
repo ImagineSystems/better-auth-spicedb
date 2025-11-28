@@ -23,7 +23,6 @@ Using your favourite Node package manager; e.g. bun:
 bun add better-auth-spicedb @authzed/authzed-node zod
 ```
 
----
 
 ## Quick Start
 
@@ -175,7 +174,6 @@ export const authClient = createAuthClient({
 });
 ```
 
----
 
 ## Usage Patterns
 
@@ -194,7 +192,7 @@ export const load: PageServerLoad = async ({ locals, fetch }) => {
     
     if (!session) throw redirect(302, '/login');
     
-    // ✅ Get IDs of agents user can view
+    // Get IDs of agents user can view
     const response = await fetch('/api/spicedb/lookup-resources', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -206,7 +204,7 @@ export const load: PageServerLoad = async ({ locals, fetch }) => {
     
     const { resourceIds } = await response.json();
     
-    // ✅ Fetch only allowed agents from database
+    // Fetch only allowed agents from database
     const agents = await db.select()
         .from(agents)
         .where(inArray(agents.id, resourceIds));
@@ -225,7 +223,7 @@ export const actions: Actions = {
     updateAgent: async ({ request, params, fetch }) => {
         const agentId = params.id;
         
-        // ✅ Check if user can edit this specific agent
+        // Check if user can edit this specific agent
         const response = await fetch('/api/spicedb/check', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -272,7 +270,7 @@ Use permissions to show/hide UI elements:
   });
   
   async function checkPermissions() {
-    // ✅ Bulk check for better performance
+    // Bulk check for better performance
     const result = await authClient.spicedb.checkBulk({
       checks: data.agents.flatMap(agent => [
         { resourceType: 'agent', resourceId: agent.id, permission: 'edit' },
@@ -330,7 +328,6 @@ async function loadAgents() {
 }
 ```
 
----
 
 ## API Reference
 
@@ -432,7 +429,7 @@ const result = await authClient.spicedb.lookupResources({
 // Returns: { resourceIds: string[] }
 ```
 
-#### `writeRelationship(params)` (Admin Only)
+#### `writeRelationship(params)` 
 
 Manually write a relationship to SpiceDB.
 
@@ -444,7 +441,7 @@ await authClient.spicedb.writeRelationship({
 });
 ```
 
-#### `deleteRelationship(params)` (Admin Only)
+#### `deleteRelationship(params)` 
 
 Manually delete a relationship from SpiceDB.
 
@@ -456,7 +453,6 @@ await authClient.spicedb.deleteRelationship({
 });
 ```
 
----
 
 ## What Gets Synced Automatically?
 
@@ -466,7 +462,6 @@ await authClient.spicedb.deleteRelationship({
 | `syncOrganizations: true` | User leaves org | Deletes: `organization:123#member@user:456` |
 | Custom relationship mapping | Your custom event | Based on your mapping config |
 
----
 
 ## Best Practices
 
@@ -526,20 +521,6 @@ await authClient.spicedb.check({
     }
 });
 ```
-
----
-
-## Comparison with Other Solutions
-
-| Feature | better-auth-spicedb | better-auth-abac | DIY with SQL |
-|---------|---------------------|------------------|--------------|
-| **Storage** | External SpiceDB | Database tables | Your tables |
-| **Best For** | Hierarchies & relationships | Dynamic policies | Simple checks |
-| **Performance** | Excellent (graph DB) | Good | Depends |
-| **Complexity** | Low (declarative) | Medium | High |
-| **Scalability** | Excellent | Good | Limited |
-
----
 
 ## Advanced: Multi-Tenancy
 
