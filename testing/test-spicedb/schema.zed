@@ -1,0 +1,28 @@
+// schema.zed
+definition user {}
+
+definition organization {
+    relation member: user
+    relation admin: user
+    
+    permission view = member + admin
+    permission manage = admin
+}
+
+definition department {
+    relation organization: organization
+    relation member: user
+    relation manager: user
+    
+    permission view = member + manager + organization->admin
+    permission manage = manager + organization->admin
+}
+
+definition agent {
+    relation department: department
+    relation owner: user
+    
+    permission view = department->member + owner
+    permission edit = owner + department->manage
+    permission delete = owner
+}
