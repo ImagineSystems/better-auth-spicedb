@@ -16,14 +16,18 @@ export type {
     PermissionContext
 } from './types';
 
-// Helper to emit custom events for SpiceDB sync
-export function createEventEmitter(auth: any) {
+/**
+ * Create an event emitter that works with SpiceDB plugin hooks
+ */
+export function createEventEmitter(plugin: ReturnType<typeof import('./server').spicedb>) {
     return async function emitEvent(eventName: string, data: any) {
-        const plugin = auth.$Infer?.Plugin?.spicedb;
-        if (plugin?.hooks?.[eventName]) {
-            await Promise.all(
-                plugin.hooks[eventName].map((fn: Function) => fn(data))
-            );
+        const eventHooks = plugin.hooks?.[eventName];
+
+        if (eventHooks && Array.isArray(eventHooks)) {
+            console.log(`[SpiceDB] Dispatching '${eventName}' to ${eventHooks.length} hooks...`);
+            await Promise.all(eventHooks.map((fn: Function) => fn(data)));
+        } else {
+            console.warn(`[SpiceDB] No hooks registered for event '${eventName}'.`);
         }
     };
 }
