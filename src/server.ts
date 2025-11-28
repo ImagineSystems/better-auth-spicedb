@@ -1,12 +1,13 @@
+// src/server.ts
 import type { BetterAuthPlugin } from "better-auth";
 import { v1 } from "@authzed/authzed-node";
 import struct_pb from "google-protobuf/google/protobuf/struct_pb";
 const { Struct } = struct_pb;
-import { createAuthEndpoint } from "better-auth/api";
+import { createAuthEndpoint, getSessionFromCtx } from "better-auth/api";
 import { z } from "zod";
-import type { SpiceDBPluginOptions, RelationshipMapping } from "./types";
+import type { SpiceDBPluginOptions } from "./types";
 
-export const spicedb = (options: SpiceDBPluginOptions): BetterAuthPlugin => {
+export const spicedb = (options: SpiceDBPluginOptions) => {
   const client = v1.NewClient(
     options.token,
     options.endpoint,
@@ -151,16 +152,16 @@ export const spicedb = (options: SpiceDBPluginOptions): BetterAuthPlugin => {
             resourceType: z.string(),
             resourceId: z.string(),
             permission: z.string(),
-            subjectId: z.string().optional(), // Optional - defaults to current user
+            subjectId: z.string().optional(),
             subjectType: z.string().default("user"),
             context: z.record(z.any()).optional(),
           }),
         },
         async (ctx) => {
-          const session = ctx.context.session;
+          const session = await getSessionFromCtx(ctx);
+
           const { resourceType, resourceId, permission, subjectId, subjectType, context } = ctx.body;
 
-          // If no subjectId provided, must be authenticated
           const actualSubjectId = subjectId || session?.user?.id;
           if (!actualSubjectId) {
             return ctx.json({ allowed: false, reason: "unauthenticated" }, { status: 401 });
@@ -210,7 +211,8 @@ export const spicedb = (options: SpiceDBPluginOptions): BetterAuthPlugin => {
           }),
         },
         async (ctx) => {
-          const session = ctx.context.session;
+          const session = await getSessionFromCtx(ctx);
+
           const { checks, subjectId, subjectType, context } = ctx.body;
 
           const actualSubjectId = subjectId || session?.user?.id;
@@ -270,7 +272,8 @@ export const spicedb = (options: SpiceDBPluginOptions): BetterAuthPlugin => {
           }),
         },
         async (ctx) => {
-          const session = ctx.context.session;
+          const session = await getSessionFromCtx(ctx);
+
           const { resourceType, permission, subjectId, subjectType, context } = ctx.body;
 
           const actualSubjectId = subjectId || session?.user?.id;
@@ -294,16 +297,32 @@ export const spicedb = (options: SpiceDBPluginOptions): BetterAuthPlugin => {
                   fullyConsistent: true
                 }
               }),
-            context: context ? (Struct.fromJavaScript(context) as any) : undefined,            });
+              context: context ? (Struct.fromJavaScript(context) as any) : undefined,
+            });
 
             const resourceIds: string[] = [];
-            for await (const response of await promiseClient.lookupResources(request)) {
-              const rawId = response.resourceObjectId;
-              const id = options.namespace && rawId.startsWith(options.namespace)
-                ? rawId.slice(options.namespace.length)
-                : rawId;
-              resourceIds.push(id);
-            }
+            
+            // Create a promise to handle the stream
+            await new Promise<void>((resolve, reject) => {
+              const stream = client.lookupResources(request);
+              
+              stream.on('data', (response: any) => {
+                const rawId = response.resourceObjectId;
+                const id = options.namespace && rawId.startsWith(options.namespace)
+                  ? rawId.slice(options.namespace.length)
+                  : rawId;
+                resourceIds.push(id);
+              });
+              
+              stream.on('error', (err: any) => {
+                console.error('[spicedb] Stream error:', err);
+                reject(err);
+              });
+              
+              stream.on('end', () => {
+                resolve();
+              });
+            });
 
             return ctx.json({ resourceIds });
           } catch (err: any) {
@@ -318,7 +337,7 @@ export const spicedb = (options: SpiceDBPluginOptions): BetterAuthPlugin => {
         "/spicedb/write-relationship",
         {
           method: "POST",
-          requireAdmin: true, // Should be restricted
+          requireAdmin: true,
           body: z.object({
             resource: z.object({
               type: z.string(),
@@ -334,9 +353,9 @@ export const spicedb = (options: SpiceDBPluginOptions): BetterAuthPlugin => {
         async (ctx) => {
           try {
             await writeRelationship(
-              ctx.body.resource as { type: string; id: string },
+              ctx.body.resource,
               ctx.body.relation,
-              ctx.body.subject as { type: string; id: string }
+              ctx.body.subject
             );
             return ctx.json({ success: true });
           } catch (err: any) {
@@ -367,9 +386,9 @@ export const spicedb = (options: SpiceDBPluginOptions): BetterAuthPlugin => {
         async (ctx) => {
           try {
             await deleteRelationship(
-              ctx.body.resource as { type: string; id: string },
+              ctx.body.resource,
               ctx.body.relation,
-              ctx.body.subject as { type: string; id: string }
+              ctx.body.subject
             );
             return ctx.json({ success: true });
           } catch (err: any) {
@@ -379,5 +398,5 @@ export const spicedb = (options: SpiceDBPluginOptions): BetterAuthPlugin => {
         }
       ),
     },
-  };
+  } satisfies BetterAuthPlugin;
 };
