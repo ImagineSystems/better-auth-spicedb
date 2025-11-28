@@ -1,11 +1,10 @@
-// tsup.config.ts
 import { defineConfig } from 'tsup';
 
 export default defineConfig({
-  entry: ['src/index.ts'], // Your entry point
-  format: ['cjs', 'esm'],  // Output both CommonJS (.js) and ESM (.mjs)
-  dts: true,               // Generate .d.ts type definitions (Crucial!)
+  entry: ['src/index.ts', 'src/client.ts'], 
+  format: ['cjs', 'esm'],
+  dts: true,
   splitting: false,
   sourcemap: true,
-  clean: true,             // Clean the dist folder before building
+  clean: true,
 });

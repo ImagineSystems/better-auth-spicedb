@@ -1,6 +1,7 @@
 import type { BetterAuthPlugin } from "better-auth";
 import { v1 } from "@authzed/authzed-node";
-import { Struct } from "google-protobuf/google/protobuf/struct_pb";
+import struct_pb from "google-protobuf/google/protobuf/struct_pb";
+const { Struct } = struct_pb;
 import { createAuthEndpoint } from "better-auth/api";
 import { z } from "zod";
 import type { SpiceDBPluginOptions, RelationshipMapping } from "./types";
