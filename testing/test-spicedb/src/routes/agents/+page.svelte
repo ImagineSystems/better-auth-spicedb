@@ -84,7 +84,15 @@
       // Fetch only those agents
       console.log('Fetching agent data from API...');
       const response = await fetch(`/api/agents?ids=${resourceIds.join(',')}`);
-      agents = await response.json();
+      
+      const data = await response.json(); 
+      agents = data.agents; 
+
+      console.log('Fetched agents from API:', agents);
+
+      if (!agents || !Array.isArray(agents)) {
+        throw new Error('Invalid agent data received from API');
+      }
       
       console.log('Fetched agents:', agents);
       
