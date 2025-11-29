@@ -15,14 +15,35 @@ This plugin features:
 
 ---
 
+## Prerequisites
+- Node.js *v18 or higher*
+- A Node package manager -  e.g. Bun
+- A SpiceDB installation - e.g. on Docker
+
 ## Installation
 
-Using your favourite Node package manager; e.g. bun:
+Using your favourite Node package manager; e.g. Bun:
 
 ```bash
-bun add better-auth-spicedb @authzed/authzed-node zod
+bun i 
 ```
 
+If using Docker, start SpiceDB with:
+
+```bash
+docker run --rm \
+  -p 50051:50051 \
+  -p 8443:8443 \
+  authzed/spicedb serve \
+  --grpc-preshared-key "testkey" \ 
+  --datastore-engine memory
+```
+*Note: use an actual key in production!*
+
+Install Zed CLI, e.g. on macOS:
+```bash
+brew install authzed/tap/zed
+```
 
 ## Quick Start
 
@@ -66,6 +87,14 @@ definition agent {
 }
 ```
 
+```bash
+zed schema write --insecure \
+  --endpoint localhost:50051 \
+  --token "testkey" \
+  schema.zed
+```
+*Note: use an actual key in production without the `--insecure` flag!*
+
 ---
 
 ### 2. Server Configuration
@@ -76,48 +105,54 @@ Set up the plugin in your Better Auth config:
 // src/lib/auth.ts
 import { betterAuth } from "better-auth";
 import { organization } from "better-auth/plugins";
-import { spicedb } from "better-auth-spicedb";
+import { spicedb, createEventEmitter } from "better-auth-spicedb";
+
+const spiceDBPlugin = spicedb({
+    endpoint: process.env.SPICEDB_ENDPOINT!, // e.g., "localhost:50051"
+    token: process.env.SPICEDB_TOKEN!,
+    insecure: process.env.NODE_ENV === "development",
+
+    // Optional: Auto-sync organization membership
+    syncOrganizations: true,
+
+    // Define custom relationship mappings
+    relationships: [
+        // When an agent is created
+        {
+            on: "agent.created",
+            resourceType: "agent",
+            relation: "owner",
+            subjectType: "user",
+            resourceId: (event) => event.agent.id,
+            subjectId: (event) => event.agent.createdBy
+        },
+        
+        // When user joins department
+        {
+            on: "department.member.added",
+            resourceType: "department",
+            relation: "member",
+            subjectType: "user",
+            resourceId: (event) => event.departmentId,
+            subjectId: (event) => event.userId
+        }
+    ]
+});
 
 export const auth = betterAuth({
     database: {
         // your db config
     },
+    baseURL: "http://localhost:5173", // important!
     plugins: [
         organization(), // Optional: enables auto-sync for orgs
-        
-        spicedb({
-            endpoint: process.env.SPICEDB_ENDPOINT!, // e.g., "localhost:50051"
-            token: process.env.SPICEDB_TOKEN!,
-            insecure: process.env.NODE_ENV === "development",
-            
-            // Optional: Auto-sync organization membership
-            syncOrganizations: true,
-            
-            // Define custom relationship mappings
-            relationships: [
-                // When an agent is created
-                {
-                    on: "agent.created",
-                    resourceType: "agent",
-                    relation: "owner",
-                    subjectType: "user",
-                    resourceId: (event) => event.agent.id,
-                    subjectId: (event) => event.agent.createdBy
-                },
-                
-                // When user joins department
-                {
-                    on: "department.member.added",
-                    resourceType: "department",
-                    relation: "member",
-                    subjectType: "user",
-                    resourceId: (event) => event.departmentId,
-                    subjectId: (event) => event.userId
-                }
-            ]
-        })
+        spiceDBPlugin
     ]
 });
+
+// register an event emitter
+export const emitEvent = createEventEmitter(spiceDBPlugin);
+
 ```
 
 ---
@@ -128,10 +163,7 @@ When you create resources, emit events to trigger SpiceDB sync:
 
 ```ts
 // src/lib/services/agentService.ts
-import { auth } from '$lib/auth';
-import { createEventEmitter } from 'better-auth-spicedb';
-
-const emitEvent = createEventEmitter(auth);
+import { emitEvent } from '$lib/auth';
 
 export async function createAgent(data: {
     name: string;
@@ -308,7 +340,7 @@ Use permissions to show/hide UI elements:
 {/each}
 ```
 
-### Pattern 4: Client-Side Resource Lookup
+### Pattern 4: Client-Side Resource Lookup (Not Recommended)
 
 For client-side routing or dynamic filtering:
 
@@ -327,7 +359,10 @@ async function loadAgents() {
     return await response.json();
 }
 ```
+> [!WARNING]
+> Do NOT implement the fetch API call on the server without **authorization** AND an **additional check** on the resource Ids requested. Without this, your code is vulnerable to an IDOR (Insecure Direct Object Reference) attack. 
 
+Due to the warning above and the additional check required, this approach should be used as a last resort.
 
 ## API Reference
 
